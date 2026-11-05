@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f2937">
+  <title>직관 기록</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 1. 응원팀 선택 화면 -->
+  <section id="picker" class="screen" hidden>
+    <div class="picker-head">
+      <p class="eyebrow">직관 기록</p>
+      <h1 id="picker-title">응원하는 팀을 골라 주세요</h1>
+      <p class="sub">고른 팀의 색으로 앱 분위기가 바뀌어요. 나중에 설정에서 바꿀 수 있어요.</p>
+    </div>
+    <ul class="team-grid" id="team-grid"></ul>
+    <div class="picker-actions">
+      <button class="btn ghost" id="picker-cancel" hidden>취소</button>
+      <button class="btn primary" id="picker-confirm" disabled>이 팀으로 시작</button>
+    </div>
+  </section>
+
+  <!-- 2. 메인 화면 -->
+  <section id="home" class="screen" hidden>
+    <header class="hero">
+      <div class="hero-top">
+        <span class="badge" id="hero-badge"></span>
+        <button class="icon-btn" id="open-settings" aria-label="설정">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+      <p class="hero-label">나의 직관 기록</p>
+      <h1 class="hero-team" id="hero-team"></h1>
+      <div class="stats">
+        <div><strong id="stat-games">0</strong><span>직관</span></div>
+        <div><strong id="stat-record">0승 0패</strong><span>전적</span></div>
+        <div><strong id="stat-rate">-</strong><span>직관 승률</span></div>
+      </div>
+      <p class="hero-spend">누적 직관 지출 <strong id="stat-spend">0원</strong></p>
+    </header>
+
+    <main class="content">
+      <section class="card" id="mvp-card">
+        <div class="card-head">
+          <h2>누적 MVP</h2>
+          <span class="muted small-text">내가 뽑은 MVP 횟수</span>
+        </div>
+        <ol class="mvp-list" id="mvp-list"></ol>
+        <p class="empty small" id="mvp-empty">기록에 MVP를 뽑으면 여기에 쌓여요.</p>
+      </section>
+
+      <div class="section-head">
+        <h2>경기 기록</h2>
+        <button class="btn primary small" id="open-form">+ 기록 추가</button>
+      </div>
+      <ul class="record-list" id="record-list"></ul>
+      <p class="empty" id="empty">아직 기록이 없어요.<br>첫 직관을 기록해 보세요!</p>
+    </main>
+  </section>
+
+  <!-- 3. 기록 추가 -->
+  <dialog id="form-dialog">
+    <form id="record-form" method="dialog">
+      <h2>직관 기록 추가</h2>
+
+      <fieldset>
+        <legend>경기 정보</legend>
+        <label>날짜
+          <input type="date" name="date" required>
+        </label>
+        <label>상대팀
+          <select name="opponent" id="opponent-select" required></select>
+        </label>
+        <label>경기장
+          <select name="stadium" id="stadium-select" required></select>
+        </label>
+        <label id="custom-stadium-wrap" hidden>구장 이름
+          <input type="text" name="customStadium" id="custom-stadium" placeholder="예: 울산 문수야구장" maxlength="30">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>스코어 · 선발투수</legend>
+        <div class="vs-grid">
+          <span class="vs-head" id="my-team-head">우리 팀</span>
+          <span></span>
+          <span class="vs-head" id="opp-team-head">상대팀</span>
+          <input type="number" name="myScore" min="0" max="99" inputmode="numeric" required aria-label="우리 팀 점수" class="score">
+          <span class="colon">:</span>
+          <input type="number" name="oppScore" min="0" max="99" inputmode="numeric" required aria-label="상대팀 점수" class="score">
+          <input type="text" name="myPitcher" maxlength="20" placeholder="선발투수" aria-label="우리 팀 선발투수">
+          <span></span>
+          <input type="text" name="oppPitcher" maxlength="20" placeholder="선발투수" aria-label="상대팀 선발투수">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>내가 뽑은 MVP</legend>
+        <input type="text" name="mvp" list="mvp-suggest" maxlength="20" placeholder="선수 이름" aria-label="MVP">
+        <datalist id="mvp-suggest"></datalist>
+      </fieldset>
+
+      <fieldset>
+        <legend>함께 간 사람</legend>
+        <div class="chips" id="companion-chips"></div>
+        <div class="inline">
+          <input type="text" id="companion-input" list="companion-suggest" maxlength="20" placeholder="이름 입력 후 추가" aria-label="함께 간 사람">
+          <datalist id="companion-suggest"></datalist>
+          <button type="button" class="btn ghost small" id="companion-add">추가</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>직관 사진</legend>
+        <div class="thumbs" id="game-thumbs"></div>
+        <label class="upload">
+          <input type="file" accept="image/*" multiple id="game-photos" hidden>
+          <span>+ 사진 추가</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>오늘의 야구푸드</legend>
+        <div class="thumbs" id="food-thumbs"></div>
+        <label class="upload">
+          <input type="file" accept="image/*" multiple id="food-photos" hidden>
+          <span>+ 음식 사진 추가</span>
+        </label>
+        <input type="text" name="foodNote" maxlength="60" placeholder="먹은 음식 (예: 치킨, 떡볶이)" aria-label="먹은 음식">
+      </fieldset>
+
+      <fieldset>
+        <legend>쓴 금액</legend>
+        <div id="expense-rows" class="expense-rows"></div>
+        <button type="button" class="btn ghost small" id="expense-add">+ 항목 추가</button>
+        <p class="expense-total">합계 <strong id="expense-total">0원</strong></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>메모</legend>
+        <textarea name="memo" rows="2" maxlength="300" placeholder="좌석, 기억에 남는 장면…" aria-label="메모"></textarea>
+      </fieldset>
+
+      <div class="dialog-actions sticky">
+        <button type="button" class="btn ghost" id="form-cancel">취소</button>
+        <button type="submit" class="btn primary" id="form-save">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 4. 기록 상세 -->
+  <dialog id="detail-dialog">
+    <div class="detail" id="detail"></div>
+  </dialog>
+
+  <!-- 5. 사진 크게 보기 -->
+  <dialog id="photo-dialog" class="photo-dialog">
+    <img id="photo-large" alt="">
+  </dialog>
+
+  <!-- 6. 설정 -->
+  <dialog id="settings-dialog">
+    <div class="settings">
+      <h2>설정</h2>
+      <div class="setting-row">
+        <div>
+          <p class="setting-name">응원팀</p>
+          <p class="setting-value" id="settings-team"></p>
+        </div>
+        <button class="btn ghost small" id="change-team">변경</button>
+      </div>
+      <p class="muted small-text">기록은 응원팀별로 따로 모여요. 팀을 바꿨다가 다시 돌아오면 예전 기록이 그대로 있어요.</p>
+      <div class="dialog-actions">
+        <button class="btn primary" id="settings-close">닫기</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
