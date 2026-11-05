@@ -106,7 +106,7 @@ body {
 .stats div {
   background: rgba(255,255,255,.14); border-radius: 14px; padding: 12px 8px; text-align: center;
 }
-.stats strong { display: block; font-size: 18px; }
+.stats strong { display: block; font-size: clamp(14px, 4.3vw, 18px); white-space: nowrap; }
 .stats span { font-size: 12px; opacity: .8; }
 
 .content { padding: 20px 16px 40px; }
@@ -232,3 +232,66 @@ legend { padding: 0; margin-bottom: 8px; font-weight: 800; font-size: 15px; colo
 
 .photo-dialog { background: transparent; width: auto; max-width: calc(100% - 16px); }
 .photo-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 32px); border-radius: 12px; }
+
+/* ---------- 승리요정 / 패배요정 ---------- */
+.hero-fairy { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.14); }
+.fairy-desc { font-size: 13px; opacity: .9; }
+.fairy {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 11px; border-radius: 999px; font-weight: 800; font-size: 14px;
+  background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+.fairy-icon { font-size: 16px; line-height: 1; }
+.fairy-win { background: #fff7d6; color: #8a5a00; }
+.fairy-lose { background: #e8edf5; color: #3b4a63; }
+.fairy-even { background: #f1f1f4; color: #4b4b57; }
+.fairy-pending { background: #fff; color: var(--muted); }
+
+/* ---------- 전적 분석 ---------- */
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--bg); }
+.seg button { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 700; color: var(--muted); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--team); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.chart-caption { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+
+.bar-chart { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 84px 1fr; grid-template-areas: "label track" ". value"; column-gap: 10px; row-gap: 3px; align-items: center; cursor: default; }
+.bar-label { grid-area: label; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track {
+  grid-area: track; position: relative; height: 14px; border-radius: 4px; background: var(--bg);
+}
+.bar-track::after { /* 5할 기준선 */
+  content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1.5px dashed #b6bcc6;
+}
+.bar-fill { display: block; height: 100%; border-radius: 4px; background: var(--team); transition: width .4s; }
+.bar-row:hover .bar-fill { filter: brightness(1.12); }
+.bar-value { grid-area: value; font-size: 12px; color: var(--muted); }
+.bar-value strong { color: var(--text); font-size: 13px; margin-right: 4px; }
+
+.table-wrap { overflow-x: auto; }
+.split-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.split-table th, .split-table td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.split-table thead th { font-size: 12px; color: var(--muted); font-weight: 700; }
+.split-table tbody th { text-align: left; font-weight: 700; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.split-table thead th:first-child { text-align: left; }
+
+/* ---------- 시즌 결산 카드 ---------- */
+.mini-select { width: auto; padding: 6px 10px; font-size: 13px; font-weight: 700; }
+.season-card {
+  border-radius: 18px; padding: 18px; color: var(--on-team);
+  background:
+    radial-gradient(circle at 100% 0, rgba(255,255,255,.18), transparent 45%),
+    linear-gradient(150deg, var(--team), var(--team-dark));
+}
+.season-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.season-year { margin: 0; font-size: 13px; font-weight: 700; opacity: .85; }
+.season-team { margin: 2px 0 0; font-size: 20px; font-weight: 800; }
+.season-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0 12px; }
+.season-hero div { display: grid; gap: 2px; }
+.season-hero span { font-size: 12px; opacity: .85; }
+.season-hero strong { font-size: 30px; line-height: 1.1; }
+.season-hero div + div strong { font-size: 20px; padding-top: 6px; }
+.season-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.season-item { display: grid; gap: 1px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.14); min-width: 0; }
+.season-item span { font-size: 11px; opacity: .8; }
+.season-item strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.season-item small { font-size: 11px; opacity: .8; }

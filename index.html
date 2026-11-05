@@ -39,9 +39,40 @@
         <div><strong id="stat-rate">-</strong><span>직관 승률</span></div>
       </div>
       <p class="hero-spend">누적 직관 지출 <strong id="stat-spend">0원</strong></p>
+      <div class="hero-fairy" id="hero-fairy"></div>
     </header>
 
     <main class="content">
+      <section class="card">
+        <div class="card-head">
+          <h2>시즌 결산</h2>
+          <select id="season-select" class="mini-select" aria-label="시즌 선택" hidden></select>
+        </div>
+        <div class="season-card" id="season-card" hidden></div>
+        <p class="empty small" id="season-empty">기록이 쌓이면 시즌 결산 카드가 만들어져요.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>전적 분석</h2>
+          <div class="seg" role="group" aria-label="분석 기준">
+            <button type="button" data-mode="opponent" aria-pressed="true">상대팀별</button>
+            <button type="button" data-mode="stadium" aria-pressed="false">경기장별</button>
+          </div>
+        </div>
+        <div id="split-body">
+          <p class="chart-caption">막대 = 직관 승률 · 점선 = 5할</p>
+          <ul class="bar-chart" id="split-chart"></ul>
+          <div class="table-wrap">
+            <table class="split-table">
+              <thead><tr><th scope="col" id="split-table-head">상대팀</th><th scope="col">경기</th><th scope="col">승</th><th scope="col">패</th><th scope="col">무</th><th scope="col">승률</th></tr></thead>
+              <tbody id="split-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <p class="empty small" id="split-empty">기록을 추가하면 상대팀·경기장별 전적이 보여요.</p>
+      </section>
+
       <section class="card" id="mvp-card">
         <div class="card-head">
           <h2>누적 MVP</h2>

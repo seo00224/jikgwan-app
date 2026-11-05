@@ -162,22 +162,157 @@ function showHome() {
 function renderHome() {
   const list = myRecords().sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   renderStats(list);
+  renderFairy(list);
+  renderSplits(list);
+  renderSeasonOptions(list);
+  renderSeason(list);
   renderMvp(list);
   renderRecordList(list);
 }
 
+// 승/패/무 집계 + 승률(무승부 제외)
+function tally(list) {
+  let w = 0, l = 0, d = 0;
+  list.forEach((r) => { const res = resultOf(r); if (res === "win") w++; else if (res === "lose") l++; else d++; });
+  return { g: list.length, w, l, d, rate: w + l ? w / (w + l) : null };
+}
+const fmtRate = (rate) => (rate == null ? "-" : rate.toFixed(3).replace(/^0/, ""));
+const fmtWL = (t) => `${t.w}승 ${t.l}패${t.d ? ` ${t.d}무` : ""}`;
+
+// ================= 승리요정 / 패배요정 =================
+const FAIRY_MIN = 3; // 승패가 난 경기 3경기부터 판정
+function fairyOf(list) {
+  const t = tally(list);
+  const decided = t.w + t.l;
+  if (decided < FAIRY_MIN) {
+    return { kind: "pending", icon: "🥚", title: "요정 판정 중", desc: `승패가 난 직관 ${FAIRY_MIN - decided}경기 더 가면 판정돼요` };
+  }
+  if (t.rate >= 0.6) return { kind: "win", icon: "🧚", title: "승리요정", desc: "내가 가면 이긴다! 직관 필수 인원" };
+  if (t.rate <= 0.4) return { kind: "lose", icon: "🌧️", title: "패배요정", desc: "…그래도 응원은 계속된다" };
+  return { kind: "even", icon: "⚖️", title: "반반요정", desc: "이길 때도 질 때도 함께하는 찐팬" };
+}
+function fairyBadgeHTML(f) {
+  return `<span class="fairy fairy-${f.kind}"><span class="fairy-icon" aria-hidden="true">${f.icon}</span>${f.title}</span>`;
+}
+function renderFairy(list) {
+  const f = fairyOf(list);
+  $("hero-fairy").innerHTML = `${fairyBadgeHTML(f)}<span class="fairy-desc">${f.desc}</span>`;
+}
+
+// ================= 상대팀별 / 경기장별 전적 =================
+let splitMode = "opponent";
+function splitRows(list, mode) {
+  const groups = new Map();
+  list.forEach((r) => {
+    const key = mode === "opponent" ? (teamById(r.opponent)?.name || r.opponent) : r.stadium;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  return [...groups].map(([name, rs]) => ({ name, ...tally(rs) }))
+    .sort((a, b) => b.g - a.g || (b.rate ?? -1) - (a.rate ?? -1) || a.name.localeCompare(b.name));
+}
+function renderSplits(list) {
+  const rows = splitRows(list, splitMode);
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === splitMode)));
+  $("split-empty").hidden = rows.length > 0;
+  $("split-body").hidden = rows.length === 0;
+
+  // 막대그래프: 막대 길이 = 승률, 가운데 점선 = 5할
+  $("split-chart").innerHTML = rows.map((r) => `
+    <li class="bar-row" title="${esc(r.name)} · ${r.g}경기 ${fmtWL(r)} · 승률 ${fmtRate(r.rate)}">
+      <span class="bar-label">${esc(r.name)}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${r.rate == null ? 0 : Math.max(r.rate * 100, 2)}%"></span></span>
+      <span class="bar-value"><strong>${fmtRate(r.rate)}</strong> ${fmtWL(r)}</span>
+    </li>`).join("");
+
+  // 표
+  $("split-table-head").textContent = splitMode === "opponent" ? "상대팀" : "경기장";
+  $("split-table").innerHTML = rows.map((r) => `
+    <tr><th scope="row">${esc(r.name)}</th><td>${r.g}</td><td>${r.w}</td><td>${r.l}</td><td>${r.d}</td><td><strong>${fmtRate(r.rate)}</strong></td></tr>`).join("");
+}
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  splitMode = b.dataset.mode;
+  renderSplits(myRecords());
+}));
+
+// ================= 시즌 결산 카드 =================
+let seasonYear = null;
+const yearsOf = (list) => [...new Set(list.map((r) => r.date.slice(0, 4)))].sort().reverse();
+
+function renderSeasonOptions(list) {
+  const years = yearsOf(list);
+  if (!years.includes(seasonYear)) seasonYear = years[0] || null;
+  const sel = $("season-select");
+  sel.innerHTML = years.map((y) => `<option value="${y}">${y} 시즌</option>`).join("");
+  sel.value = seasonYear || "";
+  sel.hidden = years.length < 2;
+}
+$("season-select").addEventListener("change", (e) => { seasonYear = e.target.value; renderSeason(myRecords()); });
+
+function topOf(values) {
+  const m = new Map();
+  values.filter(Boolean).forEach((v) => m.set(v, (m.get(v) || 0) + 1));
+  let best = null;
+  m.forEach((n, v) => { if (!best || n > best.n) best = { v, n }; });
+  return best;
+}
+function longestWinStreak(list) {
+  let best = 0, cur = 0;
+  [...list].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)).forEach((r) => {
+    if (resultOf(r) === "win") best = Math.max(best, ++cur); else if (resultOf(r) === "lose") cur = 0;
+  });
+  return best;
+}
+
+function renderSeason(all) {
+  const list = all.filter((r) => r.date.startsWith(seasonYear));
+  $("season-empty").hidden = list.length > 0;
+  $("season-card").hidden = list.length === 0;
+  if (!list.length) return;
+
+  const team = teamById(myTeamId);
+  const t = tally(list);
+  const f = fairyOf(list);
+  const spend = list.reduce((s, r) => s + sumExpenses(r), 0);
+  const stadium = topOf(list.map((r) => r.stadium));
+  const mvp = mvpCounts(list)[0];
+  const mate = topOf(list.flatMap((r) => r.companions || []));
+  const foods = list.reduce((s, r) => s + (r.foodPhotos?.length || 0), 0);
+  const streak = longestWinStreak(list);
+  const bestOpp = splitRows(list, "opponent").filter((r) => r.w > 0).sort((a, b) => b.w - a.w || (b.rate ?? 0) - (a.rate ?? 0))[0];
+
+  const item = (label, value, sub = "") => `<div class="season-item"><span>${label}</span><strong>${value}</strong>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  $("season-card").innerHTML = `
+    <div class="season-top">
+      <div>
+        <p class="season-year">${seasonYear} 시즌 결산</p>
+        <p class="season-team">${team.name}</p>
+      </div>
+      ${fairyBadgeHTML(f)}
+    </div>
+    <div class="season-hero">
+      <div><span>직관 승률</span><strong>${fmtRate(t.rate)}</strong></div>
+      <div><span>${t.g}경기</span><strong>${fmtWL(t)}</strong></div>
+    </div>
+    <div class="season-grid">
+      ${item("시즌 MVP", mvp ? esc(mvp.name) : "-", mvp ? `${mvp.count}회 선정` : "")}
+      ${item("최다 방문 구장", stadium ? esc(stadium.v) : "-", stadium ? `${stadium.n}회` : "")}
+      ${item("천적 잡은 상대", bestOpp ? esc(bestOpp.name) : "-", bestOpp ? `${bestOpp.w}승` : "")}
+      ${item("최장 직관 연승", streak ? `${streak}연승` : "-")}
+      ${item("직관 메이트", mate ? esc(mate.v) : "-", mate ? `${mate.n}번 함께` : "")}
+      ${item("야구푸드", foods ? `${foods}장` : "-", foods ? "사진 기록" : "")}
+      ${item("총 지출", won(spend))}
+      ${item("경기당 평균", won(Math.round(spend / t.g)))}
+    </div>`;
+}
+
 // 직관 승률: 무승부 제외, 승 / (승 + 패) — 기록할 때마다 다시 계산
 function renderStats(list) {
-  let w = 0, l = 0, d = 0, spend = 0;
-  list.forEach((r) => {
-    const res = resultOf(r);
-    if (res === "win") w++; else if (res === "lose") l++; else d++;
-    spend += sumExpenses(r);
-  });
-  $("stat-games").textContent = list.length;
-  $("stat-record").textContent = `${w}승 ${l}패${d ? ` ${d}무` : ""}`;
-  $("stat-rate").textContent = w + l ? (w / (w + l)).toFixed(3).replace(/^0/, "") : "-";
-  $("stat-spend").textContent = won(spend);
+  const t = tally(list);
+  $("stat-games").textContent = t.g;
+  $("stat-record").textContent = fmtWL(t);
+  $("stat-rate").textContent = fmtRate(t.rate);
+  $("stat-spend").textContent = won(list.reduce((s, r) => s + sumExpenses(r), 0));
 }
 
 function mvpCounts(list) {
@@ -506,5 +641,9 @@ document.querySelectorAll("dialog:not(.photo-dialog)").forEach((d) =>
 );
 
 // ================= 시작 =================
+// 기록은 저장 버튼을 누르는 순간 브라우저에 자동 저장되고, 새로고침해도 남아 있어요.
+// 브라우저가 저장 공간이 부족할 때 데이터를 임의로 지우지 않도록 '영구 보관'을 요청해요.
+navigator.storage?.persist?.().catch(() => {});
+
 if (myTeamId && teamById(myTeamId)) showHome();
 else showPicker(false);
