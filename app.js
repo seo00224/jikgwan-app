@@ -588,7 +588,8 @@ async function openDetail(id) {
     ${section("직관 사진", photoGrid(r.gamePhotos, ""))}
     ${section("오늘의 야구푸드", (photoGrid(r.foodPhotos, "") + (r.foodNote ? `<p>${esc(r.foodNote)}</p>` : "")) || "")}
     ${section("쓴 금액", total && `<ul class="expense-list">${r.expenses.map((e) => `<li><span>${e.type}</span><span>${won(e.amount)}</span></li>`).join("")}
-      <li class="total"><span>합계</span><span>${won(total)}</span></li></ul>`)}
+      <li class="total"><span>합계</span><span>${won(total)}</span></li></ul>
+      <button type="button" class="btn primary receipt-open" id="receipt-open">🧾 영수증 만들고 정산하기</button>`)}
     ${section("메모", r.memo && `<p class="memo">${esc(r.memo)}</p>`)}
     <div class="dialog-actions">
       <button type="button" class="btn ghost danger" id="detail-delete">삭제</button>
@@ -596,6 +597,7 @@ async function openDetail(id) {
     </div>`;
 
   $("detail-close").addEventListener("click", () => $("detail-dialog").close());
+  $("receipt-open")?.addEventListener("click", () => openReceipt(r.id));
   $("detail-delete").addEventListener("click", async () => {
     if (!confirm("이 기록을 삭제할까요? 사진도 함께 지워져요.")) return;
     for (const pid of [...(r.gamePhotos || []), ...(r.foodPhotos || [])]) await photoDB.del(pid).catch(() => {});
@@ -623,6 +625,218 @@ $("detail-dialog").addEventListener("close", () => {
   detailUrls = [];
 });
 $("photo-dialog").addEventListener("click", () => $("photo-dialog").close());
+
+// ================= 영수증 · 정산 =================
+// 같이 간 사람과 1/N 정산 → 카카오톡 등으로 공유(이미지 + 텍스트)
+const KEY_ACCOUNT = "jikgwan.account";
+let rc = null; // 현재 영수증 상태
+
+function openReceipt(id) {
+  const r = records.find((x) => x.id === id);
+  if (!r) return;
+  rc = {
+    r,
+    items: (r.expenses || []).map((e) => ({ ...e, on: true })),
+    people: [{ name: "나", on: true }, ...(r.companions || []).map((name) => ({ name, on: true }))],
+    unit: 10,
+    account: store.get(KEY_ACCOUNT, ""),
+  };
+  $("rc-account").value = rc.account;
+  $("rc-unit").value = String(rc.unit);
+  renderReceipt();
+  $("receipt-dialog").showModal();
+  $("receipt-dialog").scrollTop = 0;
+}
+
+function calcReceipt() {
+  const items = rc.items.filter((i) => i.on);
+  const people = rc.people.filter((p) => p.on);
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const n = Math.max(people.length, 1);
+  const each = Math.ceil(total / n / rc.unit) * rc.unit; // 단위에 맞춰 올림
+  return { items, people, total, n, each };
+}
+
+function matchLine(r) {
+  const team = teamById(r.team) || teamById(myTeamId);
+  const opp = teamById(r.opponent);
+  return `${team.short} ${r.myScore} : ${r.oppScore} ${opp ? opp.short : r.opponent} (${RESULT_LABEL[resultOf(r)]})`;
+}
+
+function renderReceipt() {
+  const { r } = rc;
+  const c = calcReceipt();
+
+  // 정산 옵션: 항목 / 인원 체크
+  $("rc-items").innerHTML = rc.items.map((it, i) => `
+    <label class="check"><input type="checkbox" data-i="${i}" ${it.on ? "checked" : ""}><span>${it.type}</span><em>${won(it.amount)}</em></label>`).join("");
+  $("rc-people").innerHTML = rc.people.map((p, i) => `
+    <label class="chip-check"><input type="checkbox" data-p="${i}" ${p.on ? "checked" : ""}><span>${esc(p.name)}</span></label>`).join("");
+  $("rc-items").querySelectorAll("input").forEach((el) => el.addEventListener("change", () => { rc.items[el.dataset.i].on = el.checked; renderReceipt(); }));
+  $("rc-people").querySelectorAll("input").forEach((el) => el.addEventListener("change", () => { rc.people[el.dataset.p].on = el.checked; renderReceipt(); }));
+
+  // 영수증 미리보기
+  const others = c.people.filter((p) => p.name !== "나");
+  $("rc-paper").innerHTML = `
+    <p class="rc-title">JIKGWAN RECEIPT</p>
+    <p class="rc-sub">직관 정산 영수증</p>
+    <div class="rc-dash"></div>
+    <p class="rc-row"><span>일자</span><span>${r.date.replaceAll("-", ".")}</span></p>
+    <p class="rc-row"><span>경기</span><span>${esc(matchLine(r))}</span></p>
+    <p class="rc-row"><span>장소</span><span>${esc(r.stadium)}</span></p>
+    <div class="rc-dash"></div>
+    ${c.items.map((i) => `<p class="rc-row"><span>${i.type}</span><span>${won(i.amount)}</span></p>`).join("") || '<p class="rc-row muted"><span>정산할 항목이 없어요</span></p>'}
+    <div class="rc-dash"></div>
+    <p class="rc-row rc-total"><span>합계</span><span>${won(c.total)}</span></p>
+    <p class="rc-row"><span>인원</span><span>${c.n}명 (${c.people.map((p) => esc(p.name)).join(", ")})</span></p>
+    <div class="rc-each"><span>1인당</span><strong>${won(c.each)}</strong></div>
+    ${others.length ? `<p class="rc-note">${others.map((p) => esc(p.name)).join(", ")} → 나에게 각 ${won(c.each)}</p>` : ""}
+    ${rc.account ? `<p class="rc-account">💳 ${esc(rc.account)}</p>` : ""}
+    <div class="rc-dash"></div>
+    <p class="rc-foot">오늘도 직관 감사합니다 ⚾</p>`;
+}
+
+$("rc-unit").addEventListener("change", (e) => { rc.unit = Number(e.target.value); renderReceipt(); });
+$("rc-account").addEventListener("input", (e) => {
+  rc.account = e.target.value.trim();
+  store.set(KEY_ACCOUNT, rc.account); // 다음 정산 때도 기억
+  renderReceipt();
+});
+
+function receiptText() {
+  const { r } = rc;
+  const c = calcReceipt();
+  const others = c.people.filter((p) => p.name !== "나");
+  return [
+    "🧾 직관 정산",
+    `⚾ ${r.date.replaceAll("-", ".")} ${matchLine(r)}`,
+    `📍 ${r.stadium}`,
+    "──────────",
+    ...c.items.map((i) => `${i.type} ${won(i.amount)}`),
+    "──────────",
+    `합계 ${won(c.total)} ÷ ${c.n}명`,
+    `👉 1인당 ${won(c.each)}`,
+    others.length ? `🙋 ${others.map((p) => p.name).join(", ")} → 각 ${won(c.each)} 보내주세요!` : "",
+    rc.account ? `💳 ${rc.account}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+// 영수증 이미지(PNG) 그리기
+async function receiptImage() {
+  const { r } = rc;
+  const c = calcReceipt();
+  const team = teamById(r.team) || teamById(myTeamId);
+  const W = 720, P = 56, LH = 46;
+  const others = c.people.filter((p) => p.name !== "나");
+  const lines = 3 + c.items.length + 2 + (others.length ? 1 : 0) + (rc.account ? 1 : 0);
+  const H = 200 + lines * LH + 360;
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const font = (w, s) => `${w} ${s}px "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`;
+
+  g.fillStyle = team.main; g.fillRect(0, 0, W, H);
+  // 종이
+  const top = 40, bottom = H - 40;
+  g.fillStyle = "#ffffff";
+  g.beginPath(); g.moveTo(32, top);
+  g.lineTo(W - 32, top);
+  g.lineTo(W - 32, bottom);
+  for (let x = W - 32; x >= 32; x -= 24) g.lineTo(x, bottom - (((W - 32 - x) / 24) % 2 ? 12 : 0)); // 지그재그 하단
+  g.closePath(); g.fill();
+
+  let y = top + 70;
+  const center = (t, f, color = "#111") => { g.font = f; g.fillStyle = color; g.textAlign = "center"; g.fillText(t, W / 2, y); };
+  const row = (a, b, f = font(500, 24), color = "#222") => {
+    g.font = f; g.fillStyle = color;
+    g.textAlign = "left"; g.fillText(a, P, y);
+    g.textAlign = "right";
+    let t = b; while (g.measureText(t).width > W - P * 2 - 120 && t.length > 2) t = t.slice(0, -2) + "…";
+    g.fillText(t, W - P, y);
+    y += LH;
+  };
+  const dash = () => { g.strokeStyle = "#c9ccd1"; g.setLineDash([8, 8]); g.lineWidth = 2; g.beginPath(); g.moveTo(P, y - 26); g.lineTo(W - P, y - 26); g.stroke(); g.setLineDash([]); y += 14; };
+
+  center("JIKGWAN RECEIPT", font(800, 34)); y += 40;
+  center("직관 정산 영수증", font(500, 22), "#777"); y += 56;
+  dash();
+  row("일자", r.date.replaceAll("-", "."));
+  row("경기", matchLine(r));
+  row("장소", r.stadium);
+  dash();
+  c.items.forEach((i) => row(i.type, won(i.amount)));
+  dash();
+  row("합계", won(c.total), font(800, 28), "#111");
+  row("인원", `${c.n}명 (${c.people.map((p) => p.name).join(", ")})`);
+  y += 10;
+  g.fillStyle = mix(team.main, "#ffffff", 0.88);
+  g.beginPath(); g.roundRect(P, y - 34, W - P * 2, 92, 16); g.fill();
+  g.font = font(600, 24); g.fillStyle = "#333"; g.textAlign = "left"; g.fillText("1인당", P + 24, y + 22);
+  g.font = font(800, 42); g.fillStyle = team.main; g.textAlign = "right"; g.fillText(won(c.each), W - P - 24, y + 26);
+  y += 104;
+  if (others.length) row(`${others.map((p) => p.name).join(", ")} → 나`, `각 ${won(c.each)}`, font(600, 22), "#444");
+  if (rc.account) row("입금", rc.account, font(700, 22), "#111");
+  dash();
+  center("오늘도 직관 감사합니다 ⚾", font(500, 22), "#888");
+
+  return await new Promise((res) => cv.toBlob(res, "image/png"));
+}
+
+function toast(msg) {
+  const t = $("toast");
+  // 열린 다이얼로그(최상단 레이어) 안에 넣어야 가려지지 않음
+  (document.querySelector("#receipt-dialog[open]") || document.body).appendChild(t);
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toast.tid);
+  toast.tid = setTimeout(() => (t.hidden = true), 2200);
+}
+async function copyText(text) {
+  try {
+    // 일부 브라우저는 권한 대기로 멈출 수 있어 1초 제한
+    await Promise.race([
+      navigator.clipboard.writeText(text),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 1000)),
+    ]);
+    return true;
+  } catch {
+    const host = document.querySelector("#receipt-dialog[open]") || document.body;
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
+    host.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { /* 복사 불가 */ }
+    ta.remove();
+    if (!ok) prompt("아래 내용을 길게 눌러 복사하세요", text);
+    return ok;
+  }
+}
+
+// 카톡 공유: 휴대폰 공유창(카카오톡 선택) → 지원 안 되면 텍스트 복사
+$("rc-share").addEventListener("click", async () => {
+  const text = receiptText();
+  try {
+    const blob = await receiptImage();
+    const file = new File([blob], `직관정산_${rc.r.date}.png`, { type: "image/png" });
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], text }); return; }
+    if (navigator.share) { await navigator.share({ title: "직관 정산", text }); return; }
+  } catch (e) {
+    if (e?.name === "AbortError") return; // 사용자가 공유창 닫음
+  }
+  if (await copyText(text)) toast("정산 내용을 복사했어요. 카톡 채팅방에 붙여넣기 하세요!");
+});
+$("rc-copy").addEventListener("click", async () => {
+  if (await copyText(receiptText())) toast("복사했어요! 카톡에 붙여넣기 하세요");
+});
+$("rc-save").addEventListener("click", async () => {
+  const blob = await receiptImage();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `직관정산_${rc.r.date}.png`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("rc-close").addEventListener("click", () => $("receipt-dialog").close());
 
 // ================= 설정 =================
 $("open-settings").addEventListener("click", () => {

@@ -186,6 +186,49 @@
     <div class="detail" id="detail"></div>
   </dialog>
 
+  <!-- 4-1. 영수증 · 정산 -->
+  <dialog id="receipt-dialog">
+    <div class="receipt">
+      <h2>영수증 · 정산</h2>
+
+      <div class="rc-paper" id="rc-paper"></div>
+
+      <fieldset>
+        <legend>정산할 항목</legend>
+        <div class="checks" id="rc-items"></div>
+      </fieldset>
+      <fieldset>
+        <legend>나눌 사람</legend>
+        <div class="chips" id="rc-people"></div>
+      </fieldset>
+      <fieldset>
+        <legend>정산 설정</legend>
+        <label>1인당 금액 올림 단위
+          <select id="rc-unit">
+            <option value="1">1원 단위</option>
+            <option value="10">10원 단위</option>
+            <option value="100">100원 단위</option>
+            <option value="1000">1,000원 단위</option>
+          </select>
+        </label>
+        <label>받을 계좌 (선택 · 다음에도 기억해요)
+          <input type="text" id="rc-account" maxlength="50" placeholder="예: 토스뱅크 1000-0000-0000 홍길동">
+        </label>
+      </fieldset>
+
+      <div class="share-actions">
+        <button type="button" class="btn kakao" id="rc-share">카톡으로 공유하기</button>
+        <div class="share-sub">
+          <button type="button" class="btn ghost small" id="rc-copy">텍스트 복사</button>
+          <button type="button" class="btn ghost small" id="rc-save">이미지 저장</button>
+          <button type="button" class="btn ghost small" id="rc-close">닫기</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
   <!-- 5. 사진 크게 보기 -->
   <dialog id="photo-dialog" class="photo-dialog">
     <img id="photo-large" alt="">
